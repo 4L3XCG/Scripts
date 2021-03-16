@@ -1,0 +1,63 @@
+#obtencion del nombre
+
+clear
+echo "Introduce el nombre del cliente"
+read nombre
+
+#generacion de claves
+wg genkey | sudo tee /etc/wireguard/claves/$nombre.key | wg pubkey | sudo tee /etc/wireguard/claves/$nombre.key.pub
+
+#lectura de claves
+pubkey=$(cat /etc/wireguard/claves/$nombre.key.pub)
+privkey=$(cat /etc/wireguard/claves/$nombre.key)
+servpub=$(cat /etc/wireguard/claves/servidor.key.pub)
+
+#asignacion de ips
+ip=10
+cantidad=$(ls /etc/wireguard/clientes | wc -l)
+asignar=$(expr $ip + $cantidad)
+
+#creacion del fichero
+cat > /etc/wireguard/clientes/$nombre.conf << ENDOFFILE
+[INTERFACE]
+PrivateKey = $privkey
+Address = 10.20.20.$asignar
+DNS = 10.20.20.1
+
+[Peer]
+PublicKey = $servpub
+AllowedIPs = 0.0.0.0/0
+Endpoint = 51.68.175.192:55000
+ENDOFFILE
+
+#validacion del usuario
+sudo wg set wg0 peer $pubkey allowed-ips 10.20.20.$asignar
+
+#Generacion de codigo QR
+echo "Que quieres hacer?"
+echo "1. Visualizar codigo QR"
+echo "2. Mandar archivo de configuracion a traves de correo electronico"
+echo "3. Generar codigo QR y mandarlo por correo electronico(actualmente no en funcionamiento)"
+echo "4. Salir."
+read eleccion
+
+case $eleccion in
+
+1)
+qrencode -t ansiutf8 < /etc/wireguard/clientes/$nombre.conf
+;;
+2)
+echo "Introduce el correo al que quieres enviar la configuracion"
+read email
+echo "Buenas, a continuación te envio tus creedenciales" | mutt -s "Creedenciales Wireguard" $email -a /etc/wireguard/c>;;
+3)
+echo "Introduce el correo al que quieres enviar el codigo QR"
+read email
+qrencode ansiutf8 < /etc/wireguard/clientes/$nombre.conf -o /etc/wireguard/clientes/$nombre.png
+echo "Buenas, a continuación te envio tus creedenciales" | mutt -s "Creedenciales Wireguard" $email -a /etc/wireguard/c>;;
+4)
+echo "saliendo"
+sleep 2
+exit
+;;
+esac
